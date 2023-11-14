@@ -227,7 +227,7 @@ class BOMConfigurator {
 
 	add_sub_assembly(node, view) {
 		let dialog = new frappe.ui.Dialog({
-			fields: view.events.get_sub_assembly_modal_fields(),
+			fields: view.events.get_sub_assembly_modal_fields(node.is_root),
 			title: __("Add Sub Assembly"),
 		});
 
@@ -248,6 +248,9 @@ class BOMConfigurator {
 					fg_item: node.data.value,
 					fg_reference_id: node.data.name || this.frm.doc.name,
 					bom_item: bom_item,
+					operation: node.data.operation,
+					workstation_type: node.data.workstation_type,
+					operation_time: node.data.operation_time,
 				},
 				callback: (r) => {
 					view.events.load_tree(r, node);
@@ -259,11 +262,24 @@ class BOMConfigurator {
 
 	}
 
-	get_sub_assembly_modal_fields(read_only=false) {
-		return [
+	get_sub_assembly_modal_fields(is_root=false, read_only=false) {
+		let fields = [
 			{ label: __("Sub Assembly Item"), fieldname: "item_code", fieldtype: "Link", options: "Item", reqd: 1, read_only: read_only },
 			{ fieldtype: "Column Break" },
 			{ label: __("Qty"), fieldname: "qty", default: 1.0, fieldtype: "Float", reqd: 1, read_only: read_only },
+		]
+
+		if (this.frm.doc.make_finished_good_against_job_card && is_root) {
+			fields.push(...[
+				{ fieldtype: "Section Break" },
+				{ label: __("Operation"), fieldname: "operation", fieldtype: "Link", options: "Operation", read_only: read_only, reqd: 1, },
+				{ fieldtype: "Column Break" },
+				{ label: __("Workstation Type"), fieldname: "workstation_type", fieldtype: "Link", options: "Workstation Type", read_only: read_only, reqd: 1, },
+				{ label: __("Operation Time"), fieldname: "operation_time", fieldtype: "Int", read_only: read_only, reqd: 1, },
+			])
+		}
+
+		fields.push(...[
 			{ fieldtype: "Section Break" },
 			{ label: __("Raw Materials"), fieldname: "items", fieldtype: "Table", reqd: 1,
 				fields: [
@@ -271,12 +287,14 @@ class BOMConfigurator {
 					{ label: __("Qty"), fieldname: "qty", default: 1.0, fieldtype: "Float", reqd: 1, in_list_view: 1 },
 				]
 			},
-		]
+		])
+
+		return fields;
 	}
 
 	convert_to_sub_assembly(node, view) {
 		let dialog = new frappe.ui.Dialog({
-			fields: view.events.get_sub_assembly_modal_fields(true),
+			fields: view.events.get_sub_assembly_modal_fields(node.is_root, true),
 			title: __("Add Sub Assembly"),
 		});
 
@@ -299,6 +317,9 @@ class BOMConfigurator {
 					bom_item: bom_item,
 					fg_reference_id: node.data.name || this.frm.doc.name,
 					convert_to_sub_assembly: true,
+					operation: node.data.operation,
+					workstation_type: node.data.workstation_type,
+					operation_time: node.data.operation_time,
 				},
 				callback: (r) => {
 					node.expandable = true;

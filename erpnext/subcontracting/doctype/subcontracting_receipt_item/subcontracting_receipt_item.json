@@ -39,6 +39,7 @@
   "subcontracting_order",
   "subcontracting_order_item",
   "subcontracting_receipt_item",
+  "job_card",
   "column_break_40",
   "rejected_warehouse",
   "bom",
@@ -546,12 +547,20 @@
    "fieldtype": "Check",
    "label": "Include Exploded Items",
    "print_hide": 1
+  },
+  {
+   "fieldname": "job_card",
+   "fieldtype": "Link",
+   "label": "Job Card",
+   "options": "Job Card",
+   "read_only": 1,
+   "search_index": 1
   }
  ],
  "idx": 1,
  "istable": 1,
  "links": [],
- "modified": "2023-11-30 12:05:51.920705",
+ "modified": "2023-11-30 13:05:51.920705",
  "modified_by": "Administrator",
  "module": "Subcontracting",
  "name": "Subcontracting Receipt Item",

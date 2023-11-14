@@ -32,6 +32,7 @@ def after_install():
 	add_standard_navbar_items()
 	add_app_name()
 	update_roles()
+	make_default_operations()
 	frappe.db.commit()
 
 
@@ -59,6 +60,14 @@ def check_frappe_version():
 	)
 
 	raise SystemExit(1)
+
+
+def make_default_operations():
+	for operation in ["Assembly"]:
+		if not frappe.db.exists("Operation", operation):
+			doc = frappe.get_doc({"doctype": "Operation", "name": operation})
+			doc.flags.ignore_mandatory = True
+			doc.insert(ignore_permissions=True)
 
 
 def set_single_defaults():
