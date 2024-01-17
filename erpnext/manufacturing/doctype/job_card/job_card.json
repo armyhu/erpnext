@@ -73,6 +73,7 @@
   "requested_qty",
   "status",
   "operation_row_id",
+  "is_paused",
   "column_break_20",
   "operation_row_number",
   "operation_id",
@@ -294,7 +295,7 @@
    "fetch_from": "work_order.production_item",
    "fieldname": "production_item",
    "fieldtype": "Link",
-   "label": "Finished Good",
+   "label": "Final Product",
    "options": "Item",
    "read_only": 1
   },
@@ -520,7 +521,7 @@
   {
    "fieldname": "finished_good",
    "fieldtype": "Link",
-   "label": "Semi Finished Good",
+   "label": "Finished Good",
    "options": "Item",
    "read_only": 1
   },
@@ -606,11 +607,18 @@
    "fieldname": "backflush_from_wip_warehouse",
    "fieldtype": "Check",
    "label": "Backflush Materials From WIP Warehouse"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_paused",
+   "fieldtype": "Check",
+   "label": "Is Paused",
+   "read_only": 1
   }
  ],
  "is_submittable": 1,
  "links": [],
- "modified": "2023-11-25 11:36:59.760634",
+ "modified": "2024-01-27 16:20:28.157256",
  "modified_by": "Administrator",
  "module": "Manufacturing",
  "name": "Job Card",

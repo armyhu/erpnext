@@ -28,6 +28,8 @@ class BOMCreatorItem(Document):
 		item_code: DF.Link
 		item_group: DF.Link | None
 		item_name: DF.Data | None
+		operation: DF.Link | None
+		operation_time: DF.Int
 		parent: DF.Data
 		parent_row_no: DF.Data | None
 		parentfield: DF.Data
@@ -39,6 +41,8 @@ class BOMCreatorItem(Document):
 		stock_qty: DF.Float
 		stock_uom: DF.Link | None
 		uom: DF.Link | None
+		workstation: DF.Link | None
+		workstation_type: DF.Link | None
 	# end: auto-generated types
 
 	pass

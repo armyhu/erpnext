@@ -17,9 +17,10 @@
   "bom_created",
   "operation_section",
   "operation",
+  "operation_time",
   "column_break_cbnk",
   "workstation_type",
-  "operation_time",
+  "workstation",
   "description_section",
   "description",
   "quantity_and_rate_section",
@@ -258,12 +259,18 @@
    "fieldname": "operation_time",
    "fieldtype": "Int",
    "label": "Operation Time"
+  },
+  {
+   "fieldname": "workstation",
+   "fieldtype": "Link",
+   "label": "Workstation",
+   "options": "Workstation"
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2023-11-24 12:32:06.863933",
+ "modified": "2024-01-27 15:11:11.732059",
  "modified_by": "Administrator",
  "module": "Manufacturing",
  "name": "BOM Creator Item",

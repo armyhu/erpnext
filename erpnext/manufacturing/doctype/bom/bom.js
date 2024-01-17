@@ -29,7 +29,7 @@ frappe.ui.form.on("BOM", {
 					'item': row.finished_good,
 					'is_active': 1,
 					'docstatus': 1,
-					'make_finished_good_against_job_card': 0
+					'track_semi_finished_goods': 0
 				}
 			};
 		});
@@ -822,3 +822,85 @@ function trigger_process_loss_qty_prompt(frm, cdt, cdn, item_code) {
 		__("Set Quantity")
 	);
 }
+
+
+frappe.ui.form.on("BOM Operation", {
+	add_raw_materials(frm, cdt, cdn) {
+		let row = locals[cdt][cdn];
+		frm.events._prompt_for_raw_materials(frm, row);
+	}
+});
+
+frappe.ui.form.on("BOM", {
+	_prompt_for_raw_materials(frm, row) {
+		let fields = frm.events.get_fields_for_prompt(frm, row);
+		frm._bom_rm_dialog = new frappe.ui.Dialog({
+			title: __("Add Raw Materials"),
+			fields: fields,
+			primary_action_label: __("Add"),
+			primary_action: () => {
+				let values = frm._bom_rm_dialog.get_values();
+				if (values) {
+					frm.events._add_raw_materials(frm, values);
+					frm._bom_rm_dialog.hide();
+				}
+			}
+		});
+
+		frm._bom_rm_dialog.show();
+	},
+
+	get_fields_for_prompt(frm, row) {
+		return [
+			{ label: __("Raw Materials"), fieldname: "items", fieldtype: "Table", reqd: 1,
+				fields: [
+					{
+						label: __("Item"),
+						fieldname: "item_code",
+						fieldtype: "Link",
+						options: "Item",
+						reqd: 1,
+						in_list_view: 1,
+						change() {
+							let doc = this.doc;
+							doc.qty = 1.0;
+							this.grid.set_value("qty", 1.0, doc);
+						},
+						get_query () {
+							return {
+								filters: {
+									"name": ["!=", row.finished_good]
+								}
+							}
+						}
+					},
+					{
+						label: __("Qty"),
+						fieldname: "qty",
+						default: 1.0,
+						fieldtype: "Float",
+						reqd: 1,
+						in_list_view: 1
+					},
+				]
+			},
+			{
+				fieldname: "operation_row_id",
+				fieldtype: "Data",
+				hidden: 1,
+				default: row.idx
+			}
+		]
+	},
+
+	_add_raw_materials(frm, values) {
+		frm.call({
+			method: "add_raw_materials",
+			doc: frm.doc,
+			args: {
+				operation_row_id: values.operation_row_id,
+				items: values.items
+			}
+		})
+	},
+});

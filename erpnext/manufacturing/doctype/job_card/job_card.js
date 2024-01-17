@@ -46,8 +46,6 @@ frappe.ui.form.on('Job Card', {
 	},
 
 	refresh: function(frm) {
-		frappe.flags.pause_job = 0;
-		frappe.flags.resume_job = 0;
 		let has_items = frm.doc.items && frm.doc.items.length;
 		frm.trigger("make_fields_read_only");
 
@@ -67,7 +65,7 @@ frappe.ui.form.on('Job Card', {
 		frm.toggle_enable("for_quantity", !has_stock_entry);
 
 		if (!frm.is_new() && !frm.doc.skip_material_transfer && has_items && frm.doc.docstatus === 1) {
-			let to_request = frm.doc.for_quantity > frm.doc.material_transferred_for_manufacturing;
+			let to_request = frm.doc.for_quantity > frm.doc.transferred_qty;
 			let excess_transfer_allowed = frm.doc.__onload.job_card_excess_transfer;
 
 			if (to_request || excess_transfer_allowed) {
@@ -103,23 +101,8 @@ frappe.ui.form.on('Job Card', {
 
 		frm.trigger("toggle_operation_number");
 
-		if (!frm.doc.finished_good && frm.doc.docstatus == 1 && !frm.is_new() &&
-			(frm.doc.for_quantity > frm.doc.total_completed_qty || !frm.doc.for_quantity)
-			&& (frm.doc.items || !frm.doc.items.length || frm.doc.for_quantity == frm.doc.transferred_qty)) {
-
-			// if Job Card is link to Work Order, the job card must not be able to start if Work Order not "Started"
-			// and if stock mvt for WIP is required
-			if (frm.doc.work_order) {
-				frappe.db.get_value('Work Order', frm.doc.work_order, ['skip_transfer', 'status'], (result) => {
-					if (result.skip_transfer === 1 || result.status == 'In Process' || frm.doc.transferred_qty > 0 || !frm.doc.items.length) {
-						frm.trigger("prepare_timer_buttons");
-					}
-				});
-			} else {
-				frm.trigger("prepare_timer_buttons");
-			}
-		} else if (frm.doc.finished_good && frm.doc.docstatus == 1
-			&& (frm.doc.for_quantity - frm.doc.material_transferred_for_manufacturing <= 0 || frm.doc.skip_material_transfer)) {
+		if (frm.doc.docstatus == 1
+			&& (frm.doc.for_quantity - frm.doc.transferred_qty <= 0 || frm.doc.skip_material_transfer)) {
 			if (!frm.doc.time_logs?.length) {
 				frm.add_custom_button(__("Start Job"), () => {
 					frappe.prompt([
@@ -140,10 +123,39 @@ frappe.ui.form.on('Job Card', {
 						frm.events.start_timer(frm, data.start_time, data.employee);
 					}, __("Enter Value"), __("Start Job"));
 				}).addClass("btn-primary");
+
+			} else if (frm.doc.is_paused) {
+				frm.add_custom_button(__("Resume Job"), () => {
+					frm.call({
+						method: "resume_job",
+						doc: frm.doc,
+						args: {
+							start_time: frappe.datetime.now_datetime()
+						},
+						callback() {
+							frm.reload_doc();
+						}
+					})
+				}).addClass("btn-primary");
 			} else {
 				if (frm.doc.for_quantity - frm.doc.manufactured_qty > 0) {
-						frm.add_custom_button(__("Complete Job"), () => {
-							frm.trigger("make_finished_good");
+					if (!frm.doc.is_paused) {
+						frm.add_custom_button(__("Pause Job"), () => {
+							frm.call({
+								method: "pause_job",
+								doc: frm.doc,
+								args: {
+									end_time: frappe.datetime.now_datetime()
+								},
+								callback() {
+									frm.reload_doc();
+								}
+							})
+						});
+					}
+
+					frm.add_custom_button(__("Complete Job"), () => {
+						frm.trigger("make_finished_good");
 					}).addClass("btn-primary");
 				}
 
@@ -509,8 +521,8 @@ frappe.ui.form.on('Job Card', {
 
 		var section = frm.toolbar.page.add_inner_message(timer);
 		let currentIncrement = frm.events.get_current_time(frm);
-		if (frm.doc.finished_good && frm.doc.time_logs?.length
-			&& frm.doc.time_logs[0].to_time
+		if (frm.doc.time_logs?.length
+			&& frm.doc.time_logs[cint(frm.doc.time_logs.length) - 1].to_time
 		) {
 			updateStopwatch(currentIncrement);
 		} else if (frm.doc.status == "On Hold") {
@@ -528,12 +540,12 @@ frappe.ui.form.on('Job Card', {
 				if (d.time_in_mins) {
 					current_time += flt(d.time_in_mins, 2) * 60;
 				} else {
-					current_time += frappe.datetime.get_minute_diff(d.to_time, d.from_time) * 60;
+					current_time += get_seconds_diff(d.to_time, d.from_time);
 				}
 			} else {
-				current_time += frappe.datetime.get_minute_diff(frappe.datetime.now_datetime(), d.from_time) * 60;
+				current_time += get_seconds_diff(frappe.datetime.now_datetime(), d.from_time);
 			}
-		})
+		});
 
 		return current_time;
 	},
@@ -612,3 +624,8 @@ frappe.ui.form.on('Job Card Time Log', {
 		frm.set_value('started_time', '');
 	}
 })
+
+
+function get_seconds_diff(d1, d2) {
+	return moment(d1).diff(d2, "seconds");
+}

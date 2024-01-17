@@ -39,9 +39,14 @@
   "raw_material_cost",
   "configuration_section",
   "track_operations",
-  "make_finished_good_against_job_card",
   "column_break_obzr",
-  "final_operation",
+  "track_semi_finished_goods",
+  "final_product_operation_section",
+  "operation",
+  "operation_time",
+  "column_break_xnlu",
+  "workstation_type",
+  "workstation",
   "remarks_tab",
   "remarks",
   "section_break_yixm",
@@ -292,25 +297,52 @@
   {
    "default": "0",
    "depends_on": "track_operations",
-   "fieldname": "make_finished_good_against_job_card",
+   "fieldname": "track_semi_finished_goods",
    "fieldtype": "Check",
-   "label": "Make Finished Good Against Job Card"
+   "label": "Track Semi Finished Goods"
   },
   {
    "fieldname": "column_break_obzr",
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "final_operation",
-   "fieldtype": "Link",
-   "label": "Final Operation",
-   "options": "Operation"
-  },
-  {
    "default": "0",
    "fieldname": "track_operations",
    "fieldtype": "Check",
    "label": "Track Operations"
+  },
+  {
+   "depends_on": "eval:doc.track_semi_finished_goods === 1",
+   "fieldname": "final_product_operation_section",
+   "fieldtype": "Section Break",
+   "label": "Final Product Operation"
+  },
+  {
+   "fieldname": "column_break_xnlu",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "operation",
+   "fieldtype": "Link",
+   "label": "Operation",
+   "options": "Operation"
+  },
+  {
+   "fieldname": "operation_time",
+   "fieldtype": "Float",
+   "label": "Operation Time (in mins)"
+  },
+  {
+   "fieldname": "workstation",
+   "fieldtype": "Link",
+   "label": "Workstation",
+   "options": "Workstation"
+  },
+  {
+   "fieldname": "workstation_type",
+   "fieldtype": "Link",
+   "label": "Workstation Type",
+   "options": "Workstation Type"
   }
  ],
  "icon": "fa fa-sitemap",
@@ -321,7 +353,7 @@
    "link_fieldname": "bom_creator"
   }
  ],
- "modified": "2023-11-24 12:41:19.837486",
+ "modified": "2024-01-27 15:10:51.619561",
  "modified_by": "Administrator",
  "module": "Manufacturing",
  "name": "BOM Creator",

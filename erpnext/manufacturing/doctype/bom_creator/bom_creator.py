@@ -53,6 +53,8 @@ class BOMCreator(Document):
 		item_group: DF.Link | None
 		item_name: DF.Data | None
 		items: DF.Table[BOMCreatorItem]
+		operation: DF.Link | None
+		operation_time: DF.Float
 		plc_conversion_rate: DF.Float
 		price_list_currency: DF.Link | None
 		project: DF.Link | None
@@ -62,7 +64,11 @@ class BOMCreator(Document):
 		rm_cost_as_per: DF.Literal["Valuation Rate", "Last Purchase Rate", "Price List", "Manual"]
 		set_rate_based_on_warehouse: DF.Check
 		status: DF.Literal["Draft", "Submitted", "In Progress", "Completed", "Failed", "Cancelled"]
+		track_operations: DF.Check
+		track_semi_finished_goods: DF.Check
 		uom: DF.Link | None
+		workstation: DF.Link | None
+		workstation_type: DF.Link | None
 	# end: auto-generated types
 
 	def before_save(self):
@@ -200,8 +206,7 @@ class BOMCreator(Document):
 				frappe.throw(_("Please set {0} in BOM Creator {1}").format(label, self.name))
 
 	def on_submit(self):
-		pass
-		# self.enqueue_create_boms()
+		self.enqueue_create_boms()
 
 	@frappe.whitelist()
 	def enqueue_create_boms(self):
@@ -230,8 +235,10 @@ class BOMCreator(Document):
 
 		self.db_set("status", "In Progress")
 		production_item_wise_rm = OrderedDict({})
+
+		final_product = (self.item_code, self.name)
 		production_item_wise_rm.setdefault(
-			(self.item_code, self.name), frappe._dict({"items": [], "bom_no": "", "fg_item_data": self})
+			final_product, frappe._dict({"items": [], "bom_no": "", "fg_item_data": self})
 		)
 
 		for row in self.items:
@@ -247,10 +254,13 @@ class BOMCreator(Document):
 
 		try:
 			for d in reverse_tree:
+				if self.track_operations and self.track_semi_finished_goods and final_product == d:
+					continue
+
 				fg_item_data = production_item_wise_rm.get(d).fg_item_data
 				self.create_bom(fg_item_data, production_item_wise_rm)
 
-			if self.track_operations and self.make_finished_good_against_job_card:
+			if self.track_operations and self.track_semi_finished_goods:
 				self.make_bom_for_final_product(production_item_wise_rm)
 
 			frappe.msgprint(_("BOMs created successfully"))
@@ -277,7 +287,7 @@ class BOMCreator(Document):
 				"bom_creator_item": self.name,
 				"rm_cost_as_per": "Manual",
 				"with_operations": 1,
-				"make_finished_good_against_job_card": 1,
+				"track_semi_finished_goods": 1,
 			}
 		)
 
@@ -293,6 +303,7 @@ class BOMCreator(Document):
 				"operations",
 				{
 					"operation": item.operation,
+					"workstation": item.workstation,
 					"finished_good": item.item_code,
 					"finished_good_qty": item.qty,
 					"bom_no": production_item_wise_rm[(item.item_code, item.name)].bom_no,
@@ -301,15 +312,29 @@ class BOMCreator(Document):
 				},
 			)
 
-		bom.append(
+		operation_row = bom.append(
 			"operations",
 			{
-				"operation": self.final_operation,
+				"operation": self.operation,
+				"time_in_mins": self.operation_time,
+				"workstation": self.workstation,
+				"workstation_type": self.workstation_type,
 				"finished_good": self.item_code,
 				"finished_good_qty": self.qty,
-				"bom_no": production_item_wise_rm[(self.item_code, self.name)].bom_no,
 			},
 		)
+
+		final_product = (self.item_code, self.name)
+		items = production_item_wise_rm.get(final_product).get("items")
+
+		bom.set_materials_based_on_operation_bom()
+
+		for item in items:
+			item_args = {"operation_row_id": operation_row.idx}
+			for field in BOM_ITEM_FIELDS:
+				item_args[field] = item.get(field)
+
+			bom.append("items", item_args)
 
 		bom.save(ignore_permissions=True)
 		bom.submit()
@@ -340,7 +365,7 @@ class BOMCreator(Document):
 			}
 		)
 
-		if self.track_operations and not self.make_finished_good_against_job_card:
+		if self.track_operations and not self.track_semi_finished_goods:
 			if row.item_code == self.item_code:
 				bom.with_operations = 1
 				for item in self.items:
@@ -352,6 +377,7 @@ class BOMCreator(Document):
 						{
 							"operation": item.operation,
 							"workstation_type": item.workstation_type,
+							"workstation": item.workstation,
 							"time_in_mins": item.operation_time,
 						},
 					)
@@ -411,6 +437,10 @@ def get_children(doctype=None, parent=None, **kwargs):
 		"uom",
 		"rate",
 		"amount",
+		"workstation_type",
+		"operation",
+		"operation_time",
+		"workstation",
 	]
 
 	query_filters = {
@@ -542,10 +572,16 @@ def delete_node(**kwargs):
 
 
 @frappe.whitelist()
-def edit_qty(doctype, docname, qty, parent):
-	frappe.db.set_value(doctype, docname, "qty", qty)
+def edit_bom(doctype, docname, data, parent):
+	if isinstance(data, str):
+		data = frappe.parse_json(data)
+
+	frappe.db.set_value(doctype, docname, data)
+
 	doc = frappe.get_doc("BOM Creator", parent)
 	doc.set_rate_for_items()
 	doc.save()
+
+	frappe.msgprint(_("Updated successfully"), alert=True)
 
 	return doc

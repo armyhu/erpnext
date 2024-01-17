@@ -570,7 +570,7 @@ erpnext.work_order = {
 				}, __("Status"));
 			}
 
-			if (!frm.doc.make_finished_good_against_job_card) {
+			if (!frm.doc.track_semi_finished_goods) {
 				const show_start_btn = (frm.doc.skip_transfer
 					|| frm.doc.transfer_material_against == 'Job Card') ? 0 : 1;
 
