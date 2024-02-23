@@ -326,7 +326,8 @@ class SubcontractingController(StockController):
 			# Will be deprecated in v16
 			if row.serial_no:
 				self.available_materials[key]["serial_no"] = list(
-					set(self.available_materials[key]["serial_no"]) - set(get_serial_nos(row.serial_no))
+					set(self.available_materials[key]["serial_no"])
+					- set(get_serial_nos(row.serial_no, row.rm_item_code))
 				)
 
 			# Will be deprecated in v16
@@ -377,7 +378,7 @@ class SubcontractingController(StockController):
 			)
 
 			if row.serial_no:
-				details.serial_no.extend(get_serial_nos(row.serial_no))
+				details.serial_no.extend(get_serial_nos(row.serial_no, row.rm_item_code))
 
 			if row.batch_no:
 				details.batch_no[row.batch_no] += row.qty

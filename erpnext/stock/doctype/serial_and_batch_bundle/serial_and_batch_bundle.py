@@ -885,12 +885,10 @@ class SerialandBatchBundle(Document):
 		else:
 			serial_nos, batch_nos = get_serial_batch_from_data(self.item_code, data)
 
-		if not serial_nos and not batch_nos:
-			return
-
 		if serial_nos:
 			self.set("entries", serial_nos)
-		elif batch_nos:
+
+		if batch_nos:
 			self.set("entries", batch_nos)
 
 	def delete_serial_batch_entries(self):
@@ -940,7 +938,7 @@ def get_serial_batch_from_csv(item_code, file_path):
 		serial_nos, batch_nos = parse_csv_file_to_get_serial_batch(reader)
 
 	if serial_nos:
-		make_serial_nos(item_code, serial_nos)
+		serial_nos = make_serial_nos(item_code, serial_nos)
 
 	if batch_nos:
 		make_batch_nos(item_code, batch_nos)
@@ -1005,7 +1003,7 @@ def get_serial_batch_from_data(item_code, kwargs):
 				continue
 			serial_nos.append({"serial_no": serial_no, "qty": 1})
 
-		make_serial_nos(item_code, serial_nos)
+	serial_nos = make_serial_nos(item_code, serial_nos)
 
 	if kwargs.get("_has_serial_nos"):
 		return serial_nos
@@ -1027,51 +1025,37 @@ def create_serial_nos(item_code, serial_nos):
 
 
 def make_serial_nos(item_code, serial_nos):
-	item = frappe.get_cached_value("Item", item_code, ["description", "item_code"], as_dict=1)
-
-	serial_nos = [d.get("serial_no") for d in serial_nos if d.get("serial_no")]
-	existing_serial_nos = frappe.get_all("Serial No", filters={"name": ("in", serial_nos)})
-
-	existing_serial_nos = [d.get("name") for d in existing_serial_nos if d.get("name")]
-	serial_nos = list(set(serial_nos) - set(existing_serial_nos))
-
-	if not serial_nos:
-		return
-
-	serial_nos_details = []
-	user = frappe.session.user
-	for serial_no in serial_nos:
-		serial_nos_details.append(
-			(
-				serial_no,
-				serial_no,
-				now(),
-				now(),
-				user,
-				user,
-				item.item_code,
-				item.item_name,
-				item.description,
-				"Inactive",
-			)
+	serial_nos = {d.get("serial_no") for d in serial_nos if d.get("serial_no")}
+	existing_serial_nos = set(
+		frappe.get_all(
+			"Serial No",
+			filters={"serial_no": ("in", serial_nos), "item_code": item_code},
+			pluck="serial_no",
 		)
+	)
 
-	fields = [
-		"name",
-		"serial_no",
-		"creation",
-		"modified",
-		"owner",
-		"modified_by",
-		"item_code",
-		"item_name",
-		"description",
-		"status",
-	]
+	new_serial_nos = serial_nos - existing_serial_nos
 
-	frappe.db.bulk_insert("Serial No", fields=fields, values=set(serial_nos_details))
+	if not new_serial_nos:
+		return []
+
+	item = frappe.get_cached_value("Item", item_code, ["description", "item_code"], as_dict=1)
+	new_serial_no_names = []
+
+	for serial_no in new_serial_nos:
+		doc = frappe.new_doc("Serial No")
+		doc.serial_no = serial_no
+		doc.item_code = item.item_code
+		doc.item_name = item.item_name
+		doc.description = item.description
+		doc.status = "Inactive"
+		doc.insert()
+		new_serial_no_names.append(doc.name)
 
 	frappe.msgprint(_("Serial Nos are created successfully"), alert=True)
+
+	# Return newly named serial nos
+	return [{"serial_no": serial_no_name, "qty": 1} for serial_no_name in new_serial_no_names]
 
 
 def make_batch_nos(item_code, batch_nos):
@@ -1459,7 +1443,7 @@ def get_serial_nos_based_on_posting_date(kwargs, ignore_serial_nos):
 				serial_nos.difference_update(sns)
 
 		elif d.serial_no:
-			sns = get_serial_nos(d.serial_no)
+			sns = get_serial_nos(d.serial_no, d.item_code)
 			if d.actual_qty > 0:
 				serial_nos.update(sns)
 			else:
@@ -1525,7 +1509,7 @@ def get_reserved_serial_nos_for_pos(kwargs):
 	returned_serial_nos = []
 	for pos_invoice in pos_invoices:
 		if pos_invoice.serial_no:
-			ignore_serial_nos.extend(get_serial_nos(pos_invoice.serial_no))
+			ignore_serial_nos.extend(get_serial_nos(pos_invoice.serial_no, kwargs.item_code))
 
 		if pos_invoice.is_return:
 			continue

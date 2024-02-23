@@ -44,6 +44,7 @@
   "auto_reserve_serial_and_batch",
   "serial_and_batch_item_settings_tab",
   "section_break_7",
+  "allow_duplicate_serial_nos",
   "auto_create_serial_and_batch_bundle_for_outward",
   "pick_serial_and_batch_based_on",
   "column_break_mhzc",
@@ -427,6 +428,13 @@
    "fieldname": "use_serial_batch_fields",
    "fieldtype": "Check",
    "label": "Use Serial / Batch Fields"
+  },
+  {
+   "default": "0",
+   "description": "Allow duplicate serial numbers across different Items. Maintain uniqueness per Item.",
+   "fieldname": "allow_duplicate_serial_nos",
+   "fieldtype": "Check",
+   "label": "Allow Duplicate Serial Nos Across Items"
   }
  ],
  "icon": "icon-cog",
@@ -434,7 +442,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2024-02-04 12:01:31.931864",
+ "modified": "2024-02-15 12:01:31.931864",
  "modified_by": "Administrator",
  "module": "Stock",
  "name": "Stock Settings",
