@@ -1,5 +1,3 @@
-import json
-
 import frappe
 from frappe import _
 from frappe.model.document import Document
@@ -51,6 +49,7 @@ class PaymentRequest(Document):
 		email_to: DF.Data | None
 		grand_total: DF.Currency
 		iban: DF.ReadOnly | None
+		integration_request: DF.Link | None
 		is_a_subscription: DF.Check
 		make_sales_invoice: DF.Check
 		message: DF.Text | None
@@ -164,52 +163,47 @@ class PaymentRequest(Document):
 		elif self.payment_request_type == "Inward":
 			self.status = "Requested"
 
-		if self.payment_request_type == "Inward":
-			if self.payment_channel == "Phone":
-				self.request_phone_payment()
-			else:
-				self.set_payment_request_url()
+		if self.payment_request_type == "Inward" and self.payment_gateway:
+			controller = _get_payment_gateway_controller(self.payment_gateway)
+			tx_data = self.get_tx_data()
+			controller.on_refdoc_submission(tx_data)  # preflight check
+			self.integration_request = controller.initiate_payment(tx_data)
+			# checkout page can also be the target of a gatway initialized flow
+			# gateways also may return None if appropriate
+			self.payment_url = controller.get_payment_url(self.integration_request)
+			if not controller.is_user_flow_initiation_delegated(self.integration_request):
 				if not (self.mute_email or self.flags.mute_email):
 					self.send_email()
 					self.make_communication_entry()
 
-	def request_phone_payment(self):
-		controller = _get_payment_gateway_controller(self.payment_gateway)
-		request_amount = self.get_request_amount()
-
-		payment_record = dict(
-			reference_doctype="Payment Request",
-			reference_docname=self.name,
-			payment_reference=self.reference_name,
-			request_amount=request_amount,
-			sender=self.email_to,
-			currency=self.currency,
-			payment_gateway=self.payment_gateway,
-		)
-
-		controller.validate_transaction_currency(self.currency)
-		controller.request_for_payment(**payment_record)
-
-	def get_request_amount(self):
-		data_of_completed_requests = frappe.get_all(
-			"Integration Request",
-			filters={
-				"reference_doctype": self.doctype,
-				"reference_docname": self.name,
-				"status": "Completed",
-			},
-			pluck="data",
-		)
-
-		if not data_of_completed_requests:
-			return self.grand_total
-
-		request_amounts = sum(json.loads(d).get("request_amount") for d in data_of_completed_requests)
-		return request_amounts
-
 	def on_cancel(self):
 		self.check_if_payment_entry_exists()
 		self.set_as_cancelled()
+
+	def get_tx_data(self):
+		party = frappe.get_doc(self.party_type, self.party)
+		if self.party_type == "Supplier" and party.supplier_primary_contact:
+			contact = frappe.get_doc("Contact", party.supplier_primary_contact).as_dict()
+		elif self.party_type == "Customer" and party.customer_primary_contact:
+			contact = frappe.get_doc("Contact", party.customer_primary_contact).as_dict()
+		else:
+			contact = {}
+		if self.party_type == "Supplier" and party.supplier_primary_address:
+			address = frappe.get_doc("address", party.supplier_primary_address).as_dict()
+		elif self.party_type == "Customer" and party.customer_primary_address:
+			address = frappe.get_doc("address", party.customer_primary_address).as_dict()
+		else:
+			address = {}
+		return frappe._dict(
+			{
+				"amount": self.grand_total,
+				"currency": self.currency,
+				"reference_doctype": self.doctype,
+				"reference_docname": self.name,
+				"payer_contact": contact,
+				"payer_address": address,
+			}
+		)
 
 	def make_invoice(self):
 		from erpnext.selling.doctype.sales_order.sales_order import make_sales_invoice
@@ -218,51 +212,6 @@ class PaymentRequest(Document):
 		si.allocate_advances_automatically = True
 		si = si.insert(ignore_permissions=True)
 		si.submit()
-
-	def payment_gateway_validation(self):
-		try:
-			controller = _get_payment_gateway_controller(self.payment_gateway)
-			if hasattr(controller, "on_payment_request_submission"):
-				return controller.on_payment_request_submission(self)
-			else:
-				return True
-		except Exception:
-			return False
-
-	def set_payment_request_url(self):
-		if self.payment_account and self.payment_gateway and self.payment_gateway_validation():
-			self.payment_url = self.get_payment_url()
-
-	def get_payment_url(self):
-		if self.reference_doctype != "Fees":
-			data = frappe.db.get_value(
-				self.reference_doctype, self.reference_name, ["company", "customer_name"], as_dict=1
-			)
-		else:
-			data = frappe.db.get_value(
-				self.reference_doctype, self.reference_name, ["student_name"], as_dict=1
-			)
-			data.update({"company": frappe.defaults.get_defaults().company})
-
-		controller = _get_payment_gateway_controller(self.payment_gateway)
-		controller.validate_transaction_currency(self.currency)
-
-		if hasattr(controller, "validate_minimum_transaction_amount"):
-			controller.validate_minimum_transaction_amount(self.currency, self.grand_total)
-
-		return controller.get_payment_url(
-			**{
-				"amount": flt(self.grand_total, self.precision("grand_total")),
-				"title": data.company.encode("utf-8"),
-				"description": self.subject.encode("utf-8"),
-				"reference_doctype": "Payment Request",
-				"reference_docname": self.name,
-				"payer_email": self.email_to or frappe.session.user,
-				"payer_name": frappe.safe_encode(data.customer_name),
-				"order_id": self.name,
-				"currency": self.currency,
-			}
-		)
 
 	def set_as_paid(self):
 		if self.payment_channel == "Phone":
@@ -519,7 +468,7 @@ def make_payment_request(**args):
 	if args.order_type == "Shopping Cart":
 		frappe.db.commit()
 		frappe.local.response["type"] = "redirect"
-		frappe.local.response["location"] = pr.get_payment_url()
+		frappe.local.response["location"] = pr.payment_url
 
 	if args.return_doc:
 		return pr
