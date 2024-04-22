@@ -1211,7 +1211,7 @@ class PurchaseInvoice(BuyingController):
 				asset.name,
 				{
 					"gross_purchase_amount": purchase_amount,
-					"purchase_receipt_amount": purchase_amount,
+					"purchase_amount": purchase_amount,
 				},
 			)
 
