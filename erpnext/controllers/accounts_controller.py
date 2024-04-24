@@ -1947,6 +1947,7 @@ class AccountsController(TransactionBase):
 				"docstatus": 1,
 			},
 			pluck="status",
+			ignore_permissions=True,
 		)
 		if self.doctype in frappe.get_hooks("advance_payment_receivable_doctypes"):
 			if not stati:
