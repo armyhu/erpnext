@@ -18,6 +18,7 @@ from erpnext.buying.utils import check_on_hold_or_closed_status
 from erpnext.controllers.accounts_controller import merge_taxes
 from erpnext.controllers.buying_controller import BuyingController
 from erpnext.stock.doctype.delivery_note.delivery_note import make_inter_company_transaction
+from erpnext.utilities.authorization_control import validate_approving_authority
 
 form_grid_templates = {"items": "templates/form_grid/item_grid.html"}
 
@@ -361,9 +362,7 @@ class PurchaseReceipt(BuyingController):
 		super().on_submit()
 
 		# Check for Approving Authority
-		frappe.get_doc("Authorization Control").validate_approving_authority(
-			self.doctype, self.company, self.base_grand_total
-		)
+		validate_approving_authority(self.doctype, self.company, self.base_grand_total)
 
 		self.update_prevdoc_status()
 		if flt(self.per_billed) < 100:
