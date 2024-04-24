@@ -550,6 +550,9 @@ class Subscription(Document):
 					),
 					"cost_center": plan_doc.cost_center,
 				}
+			
+			if plan.description:
+				item["description"] = plan.description
 
 			if deferred:
 				item.update(
