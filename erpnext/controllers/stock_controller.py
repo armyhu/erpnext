@@ -469,7 +469,6 @@ class StockController(AccountsController):
 						}
 					)
 				)
-			return details
 		else:
 			details = self.get("items")
 
@@ -480,7 +479,7 @@ class StockController(AccountsController):
 					if default_cost_center and not d.get("cost_center"):
 						d.cost_center = default_cost_center
 
-			return details
+		return details
 
 	def get_items_and_warehouses(self) -> tuple[list[str], list[str]]:
 		"""Get list of items and warehouses affected by a transaction"""
@@ -1416,8 +1415,8 @@ def future_sle_exists(args, sl_entries=None):
 
 	if not sl_entries:
 		sl_entries = get_sle_entries_against_voucher(args)
-		if not sl_entries:
-			return
+	if not sl_entries:
+		return
 
 	or_conditions = get_conditions_to_validate_future_sle(sl_entries)
 
